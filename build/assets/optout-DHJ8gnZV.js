@@ -1,0 +1,2 @@
+import{d as t,b as i,s as d}from"./trackingBlocker-BKYvnM0s.js";const l=e=>{e.preventDefault(),t("Opt-out link clicked"),i(),d("opted-out"),alert("Your preference has been saved. Tracking has been disabled.")},n=()=>{const e=document.querySelectorAll(".enspyred-cookie-optout-link");if(e.length===0){t("No opt-out links found");return}e.forEach(o=>{o.addEventListener("click",l),t("Opt-out link initialized")})};document.readyState==="loading"?document.addEventListener("DOMContentLoaded",n):n();
+//# sourceMappingURL=optout-DHJ8gnZV.js.map
