@@ -26,12 +26,20 @@ Enspyred Cookie Consent provides a simple, compliant way to handle cookie consen
 
 == Installation ==
 
-1. Download the latest release ZIP from GitHub: https://github.com/enspyred/wp-plugin-enspyred-cookie-consent/releases
+= IMPORTANT: Download the Correct ZIP File =
+
+**DO NOT** download the repository ZIP from the main branch! The repository includes development files (node_modules, source code, etc.) totaling ~129MB and will not work properly when installed in WordPress.
+
+**ALWAYS** download the official release ZIP from GitHub Releases. These are clean, production-ready distributions (~2-3MB) that contain only the necessary files.
+
+= Installation Steps =
+
+1. Download the latest **release ZIP** from GitHub: https://github.com/enspyred/enspyred-cookie-consent/releases
 2. Log in to your WordPress admin panel
 3. Navigate to Plugins > Add New > Upload Plugin
-4. Choose the downloaded ZIP file and click "Install Now"
+4. Choose the downloaded release ZIP file and click "Install Now"
 5. Activate the plugin
-6. Go to Settings > Cookie Consent to configure the plugin
+6. Configure settings at Settings > Cookie Consent
 
 == Configuration ==
 

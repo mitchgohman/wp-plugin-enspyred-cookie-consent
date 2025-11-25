@@ -1,0 +1,36 @@
+{
+    "name": "enspyred-cookie-consent",
+    "private": true,
+    "version": "1.0.3",
+    "type": "module",
+    "scripts": {
+        "watch": "vite build --watch",
+        "build": "vite build",
+        "clean": "rm -rf build",
+        "prebuild": "npm run clean",
+        "sync-version": "node sync-version.js",
+        "prepackage": "npm run sync-version",
+        "package": "npm run build && npm run package:create",
+        "package:create": "rm -rf dist/enspyred-cookie-consent && mkdir -p dist/enspyred-cookie-consent && rsync -av --exclude-from=.distignore . dist/enspyred-cookie-consent/ && find dist/enspyred-cookie-consent -name '.DS_Store' -delete"
+    },
+    "dependencies": {
+        "prop-types": "^15.8.1",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "styled-components": "^6.1.17"
+    },
+    "devDependencies": {
+        "@types/react": "^19.0.10",
+        "@types/react-dom": "^19.0.4",
+        "@vitejs/plugin-react": "^4.3.4",
+        "globals": "^16.0.0",
+        "vite": "^6.3.1"
+    },
+    "author": "Mitch Gohman",
+    "license": "ISC",
+    "browserslist": [
+        "defaults",
+        "not IE 11",
+        "maintained node versions"
+    ]
+}
