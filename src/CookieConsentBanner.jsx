@@ -43,7 +43,7 @@ const BannerContainer = styled.div`
 const BannerContent = styled.div`
     max-width: 1200px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 18px;
 
     @media (max-width: 768px) {
         padding: 20px 16px;
@@ -109,21 +109,15 @@ const PolicyLink = styled.a`
 
 const ButtonContainer = styled.div`
     flex: 0 0 350px;
-
     display: flex;
     gap: 12px;
-    flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-
-    @media (max-width: 768px) {
-        flex-direction: column;
-    }
 `;
 
 const Button = styled.button`
-    padding: 12px 24px;
-    font-size: 14px;
+    padding: 8px 20px;
+    font-size: 12px;
     font-weight: 500;
     border-radius: 4px;
     cursor: pointer;
@@ -133,7 +127,6 @@ const Button = styled.button`
 
     @media (max-width: 768px) {
         width: 100%;
-        padding: 14px 20px;
     }
 `;
 
@@ -158,9 +151,12 @@ const OptOutButton = styled(Button)`
 `;
 
 const ContentWrapper = styled.div`
-    display: flex;
-    gap: 18px;
+    @media (min-width: 768px) {
+        display: flex;
+        gap: 18px;
+    }
 `;
+
 const TextWrapper = styled.div`
     flex: 1;
 `;
@@ -269,7 +265,6 @@ const CookieConsentBanner = ({ settings }) => {
                         <AcceptButton onClick={handleAccept}>
                             {accept_button_text || "Accept Cookies"}
                         </AcceptButton>
-
                         <OptOutButton onClick={handleOptOut}>
                             {opt_out_button_text || "Reject Cookies"}
                         </OptOutButton>
