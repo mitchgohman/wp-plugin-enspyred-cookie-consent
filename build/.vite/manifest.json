@@ -1,24 +1,24 @@
 {
-  "_trackingBlocker-ByLTqSRs.js": {
-    "file": "assets/trackingBlocker-ByLTqSRs.js",
+  "_trackingBlocker-Dd2EBt2K.js": {
+    "file": "assets/trackingBlocker-Dd2EBt2K.js",
     "name": "trackingBlocker"
   },
   "src/index.jsx": {
-    "file": "assets/main-D-abPd_y.js",
+    "file": "assets/main-7LYyJakp.js",
     "name": "main",
     "src": "src/index.jsx",
     "isEntry": true,
     "imports": [
-      "_trackingBlocker-ByLTqSRs.js"
+      "_trackingBlocker-Dd2EBt2K.js"
     ]
   },
   "src/optOutLink.js": {
-    "file": "assets/optout-BiEbxDfG.js",
+    "file": "assets/optout-DKt-4Ic8.js",
     "name": "optout",
     "src": "src/optOutLink.js",
     "isEntry": true,
     "imports": [
-      "_trackingBlocker-ByLTqSRs.js"
+      "_trackingBlocker-Dd2EBt2K.js"
     ]
   }
 }

@@ -78,7 +78,7 @@ echo -e "${GREEN}✓ ZIP file created: ./dist/enspyred-cookie-consent.zip${NC}"
 
 # Step 5: Git commit and tag
 echo -e "\n${BLUE}Step 5: Creating git commit and tag...${NC}"
-git add package.json enspyred-cookie-consent.php
+git add .
 git commit -m "Release v${NEW_VERSION}"
 git tag -a "v${NEW_VERSION}" -m "Version ${NEW_VERSION}"
 echo -e "${GREEN}✓ Git commit and tag created${NC}"

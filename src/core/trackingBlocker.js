@@ -2,11 +2,25 @@
 // SAFE APPROACH: No monkey-patching of third-party globals
 import { debugLog } from "./debug";
 
+const ECC_COOKIE_NAME = "ecc_opted_out";
+
+/**
+ * Set the opt-out cookie for PHP to read on next page load
+ */
+const setOptOutCookie = () => {
+    const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = `${ECC_COOKIE_NAME}=1; expires=${expires}; path=/; SameSite=Lax`;
+    debugLog('Opt-out cookie set for PHP');
+};
+
 /**
  * Block all tracking scripts
  */
 export const blockAll = () => {
     debugLog('Blocking all tracking scripts...');
+
+    // Set cookie for PHP to read on next page load
+    setOptOutCookie();
 
     blockGoogleAnalytics();
     blockGoogleAds();

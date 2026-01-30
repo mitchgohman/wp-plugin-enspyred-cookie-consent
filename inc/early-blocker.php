@@ -2,11 +2,79 @@
 /**
  * Early Blocker - Prevents tracking scripts from loading for opted-out users
  *
- * SAFE APPROACH:
- * - Google Analytics: Uses official ga-disable-* flags (supported by Google)
- * - Microsoft Clarity: Blocks script injection via MutationObserver (no monkey-patching)
+ * TWO-LAYER APPROACH:
+ * 1. PHP output buffering - Strips Clarity scripts from HTML before browser receives it
+ * 2. JavaScript flags - Sets ga-disable-* flags for Google Analytics
+ *
+ * The PHP layer reads the 'ecc_opted_out' cookie (set by JavaScript when user opts out)
+ * to determine whether to strip tracking scripts server-side.
  */
 
+// Cookie name must match the one set in consent.js
+define('ECC_OPTOUT_COOKIE', 'ecc_opted_out');
+
+/**
+ * Check if user has opted out (via cookie)
+ */
+function ecc_is_opted_out() {
+    return isset($_COOKIE[ECC_OPTOUT_COOKIE]) && $_COOKIE[ECC_OPTOUT_COOKIE] === '1';
+}
+
+/**
+ * Start output buffering early to capture and modify HTML
+ * Only buffers if user has opted out
+ */
+add_action('template_redirect', 'ecc_start_output_buffer', 1);
+
+function ecc_start_output_buffer() {
+    if (is_admin()) {
+        return;
+    }
+
+    // Only buffer if user opted out - we'll need to strip scripts
+    if (ecc_is_opted_out()) {
+        ob_start('ecc_filter_tracking_scripts');
+    }
+}
+
+/**
+ * Filter callback - removes tracking scripts from HTML output
+ */
+function ecc_filter_tracking_scripts($html) {
+    if (empty($html)) {
+        return $html;
+    }
+
+    $settings = ecc_get_settings();
+    $debug_enabled = !empty($settings['debug_mode']);
+
+    // Pattern to match Microsoft Clarity scripts
+    // Matches both external scripts (clarity.ms) and inline initialization
+    $patterns = [
+        // External Clarity script
+        '/<script[^>]*src=["\'][^"\']*clarity\.ms[^"\']*["\'][^>]*>.*?<\/script>/is',
+        // Inline Clarity initialization (window.clarity or clarity())
+        '/<script[^>]*>(?=[^<]*(?:clarity\.ms|window\.clarity\s*=|clarity\s*\(\s*["\']|function\s+clarity\s*\()).*?<\/script>/is',
+    ];
+
+    $removed_count = 0;
+    foreach ($patterns as $pattern) {
+        $html = preg_replace($pattern, '<!-- ECC: Clarity script blocked -->', $html, -1, $count);
+        $removed_count += $count;
+    }
+
+    // Add debug comment if enabled
+    if ($debug_enabled && $removed_count > 0) {
+        $html = str_replace('</head>', "<!-- ECC Debug: Removed {$removed_count} Clarity script(s) -->\n</head>", $html);
+    }
+
+    return $html;
+}
+
+/**
+ * Inject JavaScript for GA blocking and cookie management
+ * Runs in wp_head with highest priority
+ */
 add_action('wp_head', 'ecc_inject_early_blocker', 1);
 
 function ecc_inject_early_blocker() {
@@ -23,9 +91,24 @@ function ecc_inject_early_blocker() {
         'use strict';
 
         var ECC_DEBUG = <?php echo json_encode($debug_enabled); ?>;
+        var ECC_COOKIE_NAME = '<?php echo ECC_OPTOUT_COOKIE; ?>';
 
         function log(msg) {
             if (ECC_DEBUG) console.log('[Cookie Consent] ' + msg);
+        }
+
+        /**
+         * Set the opt-out cookie (for PHP to read on next page load)
+         * This is also called from consent.js, but we check here too
+         * in case localStorage has opt-out but cookie is missing
+         */
+        function syncCookie(optedOut) {
+            if (optedOut) {
+                var expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+                document.cookie = ECC_COOKIE_NAME + '=1; expires=' + expires + '; path=/; SameSite=Lax';
+            } else {
+                document.cookie = ECC_COOKIE_NAME + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            }
         }
 
         // Check localStorage for opt-out status
@@ -38,13 +121,20 @@ function ecc_inject_early_blocker() {
             // Check if expired
             if (consent.expiresAt && Date.now() > consent.expiresAt) {
                 localStorage.removeItem('enspyred_cookie_consent');
+                syncCookie(false);
                 return;
             }
 
             // Only block if opted out
-            if (consent.choice !== 'opted-out') return;
+            if (consent.choice !== 'opted-out') {
+                syncCookie(false);
+                return;
+            }
 
             log('User opted out - blocking tracking');
+
+            // Ensure cookie is set for PHP (in case it was cleared)
+            syncCookie(true);
 
             // === GOOGLE ANALYTICS (Safe approach using official flags) ===
 
@@ -52,67 +142,47 @@ function ecc_inject_early_blocker() {
             window['ga-disable'] = true;
 
             // GA4 specific disable (catches G-XXXXXXX properties)
-            // Google checks window['ga-disable-' + measurementId] before tracking
             window['ga-disable-G-'] = true;
 
             // Delete existing GA cookies
             var gaCookies = ['_ga', '_gid', '_gat', '_gat_gtag', '_gac_gb'];
             deleteCookies(gaCookies);
 
-            // === MICROSOFT CLARITY (Safe approach - block script loading) ===
+            // === MICROSOFT CLARITY ===
+            // Clarity scripts are stripped server-side via PHP output buffering
+            // But we still delete cookies and set up observer for any dynamic scripts
 
-            // Instead of monkey-patching window.clarity, we prevent the script from loading
-            // Using MutationObserver to intercept and remove Clarity scripts before execution
+            // Delete existing Clarity cookies
+            var clarityCookies = ['_clck', '_clsk', 'CLID', 'ANONCHK', 'MR', 'MUID', 'SM'];
+            deleteCookies(clarityCookies);
 
+            // MutationObserver as backup for dynamically-injected scripts
             var clarityObserver = new MutationObserver(function(mutations) {
                 mutations.forEach(function(mutation) {
                     mutation.addedNodes.forEach(function(node) {
                         if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
                             var src = node.src || '';
-                            var content = node.textContent || '';
-
-                            // Block Clarity script by src
                             if (src.indexOf('clarity.ms') !== -1) {
                                 node.remove();
-                                log('Blocked Clarity script (src): ' + src);
-                                return;
-                            }
-
-                            // Block inline Clarity initialization
-                            if (content.indexOf('clarity') !== -1 &&
-                                (content.indexOf('clarity.ms') !== -1 ||
-                                 content.indexOf('window.clarity') !== -1)) {
-                                node.remove();
-                                log('Blocked Clarity inline script');
-                                return;
+                                log('Blocked dynamically-added Clarity script');
                             }
                         }
                     });
                 });
             });
 
-            // Start observing immediately (before Clarity can load)
             clarityObserver.observe(document.documentElement, {
                 childList: true,
                 subtree: true
             });
 
-            // Store reference for cleanup after page load
-            window.__eccClarityObserver = clarityObserver;
-
-            // Stop observing after page fully loads (performance optimization)
+            // Stop observing after page load
             window.addEventListener('load', function() {
                 setTimeout(function() {
-                    if (window.__eccClarityObserver) {
-                        window.__eccClarityObserver.disconnect();
-                        log('Clarity observer disconnected (page loaded)');
-                    }
+                    clarityObserver.disconnect();
+                    log('Clarity observer disconnected');
                 }, 1000);
             });
-
-            // Delete existing Clarity cookies
-            var clarityCookies = ['_clck', '_clsk', 'CLID', 'ANONCHK', 'MR', 'MUID', 'SM'];
-            deleteCookies(clarityCookies);
 
             log('Tracking blocked successfully');
 
