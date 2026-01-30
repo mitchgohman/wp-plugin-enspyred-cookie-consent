@@ -2,7 +2,7 @@
 /*
 Plugin Name: Enspyred Cookie Consent
 Description: CCPA-compliant cookie consent banner with opt-out functionality for tracking scripts.
-Version: 1.0.7
+Version: 1.0.8
 Author: Enspyred
 Author URI: https://enspyred.com
 License: GPL v2 or later
