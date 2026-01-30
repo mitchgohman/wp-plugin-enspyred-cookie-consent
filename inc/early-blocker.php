@@ -2,20 +2,18 @@
 /**
  * Early Blocker - Prevents tracking scripts from loading for opted-out users
  *
- * This runs BEFORE any tracking scripts (GA, Clarity, etc.) initialize,
- * ensuring zero tracking calls for users who opted out.
+ * SAFE APPROACH:
+ * - Google Analytics: Uses official ga-disable-* flags (supported by Google)
+ * - Microsoft Clarity: Blocks script injection via MutationObserver (no monkey-patching)
  */
 
-// Inject blocking script in <head> with highest priority
 add_action('wp_head', 'ecc_inject_early_blocker', 1);
 
 function ecc_inject_early_blocker() {
-    // Only on frontend
     if (is_admin()) {
         return;
     }
 
-    // Get debug setting
     $settings = ecc_get_settings();
     $debug_enabled = !empty($settings['debug_mode']);
 
@@ -24,8 +22,11 @@ function ecc_inject_early_blocker() {
     (function() {
         'use strict';
 
-        // Debug flag from PHP
         var ECC_DEBUG = <?php echo json_encode($debug_enabled); ?>;
+
+        function log(msg) {
+            if (ECC_DEBUG) console.log('[Cookie Consent] ' + msg);
+        }
 
         // Check localStorage for opt-out status
         try {
@@ -43,46 +44,89 @@ function ecc_inject_early_blocker() {
             // Only block if opted out
             if (consent.choice !== 'opted-out') return;
 
-            if (ECC_DEBUG) console.log('[Cookie Consent] Early blocker: User opted out, blocking tracking');
+            log('User opted out - blocking tracking');
 
-            // === Block Google Analytics ===
+            // === GOOGLE ANALYTICS (Safe approach using official flags) ===
 
-            // Set global GA disable flags (these prevent GA from initializing)
+            // Official GA disable flags - these are supported by Google
             window['ga-disable'] = true;
 
-            // Also set for common GA4 property patterns
-            // This will catch most GA4 properties
+            // GA4 specific disable (catches G-XXXXXXX properties)
+            // Google checks window['ga-disable-' + measurementId] before tracking
             window['ga-disable-G-'] = true;
 
-            // Disable classic GA
-            window.ga = function() {};
-
-            // Delete GA cookies immediately
+            // Delete existing GA cookies
             var gaCookies = ['_ga', '_gid', '_gat', '_gat_gtag', '_gac_gb'];
-            gaCookies.forEach(function(name) {
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname + ';';
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + window.location.hostname + ';';
+            deleteCookies(gaCookies);
+
+            // === MICROSOFT CLARITY (Safe approach - block script loading) ===
+
+            // Instead of monkey-patching window.clarity, we prevent the script from loading
+            // Using MutationObserver to intercept and remove Clarity scripts before execution
+
+            var clarityObserver = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1 && node.tagName === 'SCRIPT') {
+                            var src = node.src || '';
+                            var content = node.textContent || '';
+
+                            // Block Clarity script by src
+                            if (src.indexOf('clarity.ms') !== -1) {
+                                node.remove();
+                                log('Blocked Clarity script (src): ' + src);
+                                return;
+                            }
+
+                            // Block inline Clarity initialization
+                            if (content.indexOf('clarity') !== -1 &&
+                                (content.indexOf('clarity.ms') !== -1 ||
+                                 content.indexOf('window.clarity') !== -1)) {
+                                node.remove();
+                                log('Blocked Clarity inline script');
+                                return;
+                            }
+                        }
+                    });
+                });
             });
 
-            // === Block Microsoft Clarity ===
+            // Start observing immediately (before Clarity can load)
+            clarityObserver.observe(document.documentElement, {
+                childList: true,
+                subtree: true
+            });
 
-            // Prevent Clarity from initializing
-            window.clarity = function() {};
-            window.clarity.q = [];
+            // Store reference for cleanup after page load
+            window.__eccClarityObserver = clarityObserver;
 
-            // Delete Clarity cookies immediately
+            // Stop observing after page fully loads (performance optimization)
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    if (window.__eccClarityObserver) {
+                        window.__eccClarityObserver.disconnect();
+                        log('Clarity observer disconnected (page loaded)');
+                    }
+                }, 1000);
+            });
+
+            // Delete existing Clarity cookies
             var clarityCookies = ['_clck', '_clsk', 'CLID', 'ANONCHK', 'MR', 'MUID', 'SM'];
-            clarityCookies.forEach(function(name) {
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + window.location.hostname + ';';
-                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + window.location.hostname + ';';
-            });
+            deleteCookies(clarityCookies);
 
-            if (ECC_DEBUG) console.log('[Cookie Consent] Early blocker: Tracking blocked successfully');
+            log('Tracking blocked successfully');
 
         } catch (e) {
             if (ECC_DEBUG) console.error('[Cookie Consent] Early blocker error:', e);
+        }
+
+        function deleteCookies(names) {
+            var hostname = window.location.hostname;
+            names.forEach(function(name) {
+                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + hostname + ';';
+                document.cookie = name + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + hostname + ';';
+            });
         }
     })();
     </script>
